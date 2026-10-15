@@ -52,7 +52,7 @@ If the guest still hasn't checked in 24 hours after the check-in date, the hotel
 Event: `NoShowMarked`
 
 ### Reading information
-`getRoom(roomId)` and `getBooking(bookingId)` let anyone check a room or a booking. They only read data, so they cost no gas.
+`getRoom(roomId)`, `getBooking(bookingId)` and `getContractBalance()` let anyone check a room, a booking, or how much money the contract is currently holding in escrow. They only read data, so they cost no gas.
 
 ## The life of a booking
 
