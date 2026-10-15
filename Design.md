@@ -32,6 +32,7 @@ Event: `RoomBooked`
 
 ### Cancelling a booking
 `cancelBooking(bookingId)` – only the guest who made the booking
+Cancelling is only possible before the check-in date; after that, the no-show rule applies.
 
 If the guest cancels at least 48 hours before check-in, they get everything back. Closer than that, they get 50% back and the hotel keeps the other 50% as compensation for the late notice.
 
