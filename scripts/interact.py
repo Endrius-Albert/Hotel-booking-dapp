@@ -16,6 +16,7 @@ STATUS = ["Booked", "CheckedIn", "Cancelled", "NoShow"]
 
 w3 = Web3(Web3.HTTPProvider(GANACHE_URL))
 results = []
+gas_report = []   #(transaction, gas used) for the gas summary at the end
 
 
 def eth(wei):
@@ -32,9 +33,12 @@ def check(name, passed, detail=""):
     print(f"  [{label}] {name}" + (f" -> {detail}" if detail else ""))
 
 
-def send(fn, sender, value=0):
+def send(fn, sender, value=0, label=None):
     tx_hash = fn.transact({"from": sender, "value": value})
-    return w3.eth.wait_for_transaction_receipt(tx_hash)
+    receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+    if label:
+        gas_report.append((label, receipt.gasUsed))
+    return receipt
 
 
 def expect_revert(name, fn, sender, expected, value=0):
@@ -91,7 +95,7 @@ def main():
 
     step("1. Compile and deploy")
     abi, bytecode = compile_contract()
-    receipt = send(w3.eth.contract(abi=abi, bytecode=bytecode).constructor(), hotel)
+    receipt = send(w3.eth.contract(abi=abi, bytecode=bytecode).constructor(), hotel, label="Deploy contract")
     contract = w3.eth.contract(address=receipt.contractAddress, abi=abi)
     print(f"  Contract deployed at {contract.address} (block {receipt.blockNumber})")
     print(f"  Hotel (receiver): {hotel}")
@@ -99,7 +103,7 @@ def main():
 
     step("2. Hotel lists four rooms")
     for name in ["Room 101", "Room 102", "Room 103", "Room 104"]:
-        send(contract.functions.addRoom(name, price), hotel)
+        send(contract.functions.addRoom(name, price), hotel, label="addRoom" if name == "Room 101" else None)
     check("Hotel added 4 rooms", contract.functions.roomCount().call() == 4)
     expect_revert("Guest cannot add a room",
                   contract.functions.addRoom("Fake Room", 1), guest,
@@ -115,7 +119,8 @@ def main():
                   contract.functions.bookRoom(1, far, 1), hotel,
                   "The hotel cannot book its own rooms", value=price)
     for room_id, date in [(1, far), (2, near), (3, near), (4, near)]:
-        send(contract.functions.bookRoom(room_id, date, 1), guest, value=price)
+        send(contract.functions.bookRoom(room_id, date, 1), guest, value=price,
+             label="bookRoom (pays 1 ETH)" if room_id == 1 else None)
     expect_revert("A booked room cannot be booked again",
                   contract.functions.bookRoom(1, far, 1), guest,
                   "Room is already booked", value=price)
@@ -127,14 +132,14 @@ def main():
                   contract.functions.cancelBooking(2), stranger,
                   "Only the guest can cancel this booking")
 
-    receipt = send(contract.functions.cancelBooking(1), guest)
+    receipt = send(contract.functions.cancelBooking(1), guest, label="cancelBooking 48h+ (full refund)")
     event = contract.events.BookingCancelled().process_receipt(receipt)[0]["args"]
     check("Early cancellation gives a full refund",
           event["refundAmount"] == price and event["hotelAmount"] == 0,
           f"guest {eth(event['refundAmount'])}, hotel {eth(event['hotelAmount'])}")
 
     hotel_before = w3.eth.get_balance(hotel)
-    receipt = send(contract.functions.cancelBooking(2), guest)
+    receipt = send(contract.functions.cancelBooking(2), guest, label="cancelBooking late (50/50 split)")
     event = contract.events.BookingCancelled().process_receipt(receipt)[0]["args"]
     check("Late cancellation splits 50/50",
           event["refundAmount"] == price // 2 and event["hotelAmount"] == price // 2,
@@ -155,13 +160,13 @@ def main():
 
     step("7. Check-in and no-show")
     before = contract_balance(contract)
-    send(contract.functions.checkIn(3), hotel)
+    send(contract.functions.checkIn(3), hotel, label="checkIn (pays the hotel)")
     check("Check-in releases 1 ETH to the hotel", before - contract_balance(contract) == price)
     expect_revert("Second check-in is rejected (no double payment)",
                   contract.functions.checkIn(3), hotel, "Booking is not active")
 
     before = contract_balance(contract)
-    send(contract.functions.markNoShow(4), hotel)
+    send(contract.functions.markNoShow(4), hotel, label="markNoShow (pays the hotel)")
     check("No-show releases 1 ETH to the hotel", before - contract_balance(contract) == price)
 
     step("8. Final state")
@@ -170,6 +175,10 @@ def main():
         print(f"  Booking {booking_id}: room {booking[1]}, status {STATUS[booking[6]]}")
     check("Contract balance is back to 0", contract_balance(contract) == 0,
           eth(contract_balance(contract)))
+
+    step("9. Gas used per transaction")
+    for label, gas in gas_report:
+        print(f"  {label:<36}{gas:>12,}")
 
     print(f"\n{sum(results)}/{len(results)} checks passed")
 

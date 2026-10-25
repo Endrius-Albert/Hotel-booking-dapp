@@ -15,6 +15,7 @@ contract HotelBooking {
         bool isBooked;         //true while the room has an active booking
     }
 
+    //Only the guest's wallet is stored, no names or documents (data minimisation)
     struct Booking {
         uint256 id;
         uint256 roomId;
