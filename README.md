@@ -31,6 +31,7 @@ scripts/run.sh               starts Ganache, runs interact.py, then stops Ganach
 Design.md                    roles, rules, UML diagrams and test plan
 research-notes.md            research for the proposal, with Harvard references
 requirements.txt             Python libraries
+docs/CA1_DDT_Poster.pptx     poster presentation
 ```
 
 ## Tools
@@ -80,4 +81,5 @@ All **17/17 checks pass**. They cover:
 ## Status
 
 ✅ Smart contract, automated tests and documentation complete.
-🚧 Poster and video presentation in progress.
+✅ Poster presentation added to `docs/`.
+✅ Video presentation recorded.
